@@ -1,17 +1,15 @@
 [project]
 name = "coding-agent-langchain"
 version = "0.1.0"
-description = "Add your description here"
+description = "Coding agent built with LangChain"
 readme = "README.md"
 authors = [
     { name = "Himanshu Parashar", email = "parasharhimanshu41@gmail.com" }
 ]
 requires-python = ">=3.14"
-dependencies = []
+dependencies = [
+    "python-dotenv>=1.2.3",
+]
 
-[project.scripts]
-coding-agent-langchain = "coding_agent_langchain:main"
-
-[build-system]
-requires = ["uv_build>=0.12.3,<0.13.0"]
-build-backend = "uv_build"
+[tool.uv]
+package = false

@@ -3,7 +3,9 @@ from tools.paths import resolve_work_path
 import json
 import os
 from pathlib import Path
+from langchain.tools import tool
 
+@tool
 def list_files(path: str = ".") -> str:
     """
         List files and directories under a given path in the working directory.

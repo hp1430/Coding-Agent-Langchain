@@ -1,3 +1,5 @@
+from pathlib import Path
+
 _ESCAPE_MAP = (
     ("\\n", "\n"),  # def hello(): \\n print("Hello, World!") -> def hello(): \n print("Hello, World!")
     ("\\t", "\t"),
@@ -17,6 +19,9 @@ _HTML_ENTITIES = (
     ("&reg;", "®"),
     ("&trade;", "™"),
 ) # <h1> hello </h1> -> &lt;h1&gt; hello &lt;/h1&gt;
+
+_MARKDOWN_SUFFIXES = {".md", ".markdown", ".mdx"}
+_MARKUP_SUFFIXES = {".html", ".xml", ".xhtml", ".html", ".svg"}
 
 def looks_like_escaped_source(text: str) -> bool:
     """True when the payload is one logical line stuffed with \\n sequences."""
@@ -49,3 +54,28 @@ def unescape_html_entities(text: str) -> str:
         normalized = normalized.replace(entity, raw)
 
     return normalized
+
+def strip_markdown_fence(text: str) -> str:
+    """Drop a wrapping ```lang ....``` fence if present."""
+
+    if "```" not in text:
+        return text
+
+    lines = text.split("\n")
+    if lines and lines[0].lstrip().startswith("```"):
+        lines = lines[1:]
+    if lines and lines[-1].rstrip().endswith("```"):
+        lines = lines[:-1]
+    return "\n".join(lines)
+
+def prepare_file_content(path: str, text: str) -> str:
+    """Normalize text content for a file, including unescaping and stripping fences."""
+
+    suffix = Path(path).suffix.lower()
+
+    prepared = normalize_source_text(text)
+    if suffix not in _MARKDOWN_SUFFIXES:
+        prepared = strip_markdown_fence(prepared)
+    if suffix not in _MARKUP_SUFFIXES:
+        prepared = unescape_html_entities(prepared)
+    return prepared

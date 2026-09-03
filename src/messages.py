@@ -1,5 +1,5 @@
 from typing import Any
-from langchain_core.messages import AIMessage
+from langchain.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
 def user_input(text: str) -> dict[str, str]:
     """OpenAI style user input message."""
@@ -20,3 +20,30 @@ def last_ai_text(messages: list[Any]) -> str:
             ]
             return "\n".join(part for part in parts if part)
     return ""
+
+def last_tool_text(messages: list[Any]) -> str:
+    """Return the content of the most recent tool message in the list of messages."""
+    for message in reversed(messages):
+        if isinstance(message, ToolMessage):
+            content = message.content
+            return content if isinstance(content, str) else str(content)
+    return ""
+
+def describe_message(message: Any) -> str:
+    """Useful for logging and debugging"""
+    role = type(message).__name__.replace("Message", "").lower()
+    content = message.content
+    preview = content if isinstance(content, str) else str(content)
+    preview = preview.replace("\n", " ")
+    extra = ""
+
+    if isinstance(message, AIMessage) and message.tool_calls:
+        names = ", ".join(call.get("name", "?") for call in message.tool_calls)
+        extra = f" tools=[{names}]"
+    if isinstance(message, ToolMessage):
+        extra = f" tool_call_id={message.tool_call_id}"
+    if isinstance(message, SystemMessage):
+        extra = " (system)"
+    if isinstance(message, HumanMessage):
+        extra = " (human)"
+    return f"{role}{extra}: {preview}"

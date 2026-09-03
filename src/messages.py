@@ -1,0 +1,22 @@
+from typing import Any
+from langchain_core.messages import AIMessage
+
+def user_input(text: str) -> dict[str, str]:
+    """OpenAI style user input message."""
+    return {"role": "user", "content": text}
+
+def last_ai_text(messages: list[Any]) -> str:
+    for message in reversed(messages):
+        if not isinstance(message, AIMessage):
+            continue
+        if getattr(message, "tool_calls", None):
+            continue
+        content = message.content
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            parts = [
+                block.get("text", "") for block in content if isinstance(block, dict) and block.get("type") == "text"
+            ]
+            return "\n".join(part for part in parts if part)
+    return ""

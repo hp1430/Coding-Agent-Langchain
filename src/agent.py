@@ -1,8 +1,10 @@
 from langchain.agents import create_agent
 from langchain.agents.middleware import ModelCallLimitMiddleware
 from langchain.agents.structured_output import ProviderStrategy
+from langgraph.checkpoint.memory import InMemorySaver
 
 from configs.config import MAX_MODEL_CALLS_PER_RUN, hitl_enabled
+from memory import make_checkpointer
 from middlewares.audit import AuditMiddleware
 from middlewares.hitl import build_hitl_middleware
 from middlewares.protection import ProtectionMiddleware
@@ -40,6 +42,7 @@ def build_middleware(
 
 def build_agent(
     *,
+    checkpointer: InMemorySaver | None = None,
     enable_hitl: bool | None = None,
     extra_guidance: str = "",
 ):
@@ -51,5 +54,6 @@ def build_agent(
         system_prompt=build_system_prompt(extra_guidance=extra_guidance),
         middleware=build_middleware(enable_hitl=use_hitl),
         response_format=ProviderStrategy(TurnSummary),
+        checkpointer=checkpointer or make_checkpointer(),
         name="Coding Agent",
     )

@@ -7,8 +7,10 @@ import time
 from tracemalloc import start
 from turtle import stamp
 
+from langchain.tools import tool
+
 from configs.config import get_work_dir
-from tools.jobs import BackgroundJob, now_iso, read_log_tail, register, stop_pid
+from tools.jobs import BackgroundJob, all_jobs, is_alive, now_iso, read_log_tail, register, stop_pid
 
 
 MAX_OUTPUT_CHARS = 8000 
@@ -116,7 +118,7 @@ def _run_foreground(command: str, timeout: int) -> str:
     body = "\n".join(chunks) if chunks else "No output."
     return f"exit_code={completed.returncode}\ncwd={cwd}\n_{_clip(body)}"
 
-def run_background(command: str) -> str:
+def _run_background(command: str) -> str:
     cwd = get_work_dir()
     cwd.mkdir(parents=True, exist_ok=True)
     env = os.environ.copy()
@@ -177,3 +179,66 @@ def run_background(command: str) -> str:
         f"Use list jobs/stop_job to manage it.\n"
         f"------ output so far ------\n {_clip(tail) or 'No output yet.'}"
     )
+
+@tool
+def stop_job(pid: int) -> str:
+    """
+    Stop a background job previously started by run_command.
+    Args:
+        pid: The process id of the job to stop
+    """
+    return stop_pid(pid)
+
+@tool
+def run_command(command: str, background: bool = False, timeout_seconds: int = 0) -> str:
+    """
+    Run a bash command in the working directory (host machine, not a sandbox).
+
+    Foreground commands wait for completion. Set background=True for servers like (flask, uvicorn, npm start)
+    so they keep running. Server-like commands are auto backgrounded even if you forget the flag.
+
+    Args:
+        command: bash command to run, e.g. 'python app.py' or 'ls -la'.
+        background: If true, start the process and return pid immediately.
+        timeout_seconds: Maximum time to wait for the command to complete. This is for foreground timeout. 0 uses default (30s).
+    """
+
+    blocked = deny_command(command)
+
+    if blocked:
+        return blocked
+
+    timeout = timeout_seconds if timeout_seconds>0 else DEFAULT_TIMEOUT
+
+    background = bool(background) or looks_like_server(command)
+
+    command = rewrite_command(command)
+
+    if background:
+        return _run_background(command)
+    else:
+        return _run_foreground(command, timeout)
+
+@tool
+def list_jobs() -> str:
+    """
+    List background processes started by run_command (servers, long jobs).
+    """
+
+    jobs = all_jobs()
+    if not jobs:
+        return "No background jobs running."
+
+    lines = []
+    for job in jobs:
+        state = "running" if is_alive(job.pid) else "exited"
+        lines.append(
+            f"pid={job.pid} state={state} started={job.started_at} cmd={job.command}"
+        )
+        tail = read_log_tail(job.log_path, max_chars=800)
+
+        if tail:
+            lines.append(tail.rstrip())
+            lines.append("--------------------------")
+
+        return "\n".join(lines)

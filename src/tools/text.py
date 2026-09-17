@@ -29,7 +29,7 @@ def looks_like_escaped_source(text: str) -> bool:
     if "\\n" not in text:
         return False
 
-    return text.count("\\n") <= 1
+    return text.count("\n") <= 1
 
 def normalize_source_text(text: str) -> str:
     """Turn double-escaped newlines into real newlines."""

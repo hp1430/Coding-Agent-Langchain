@@ -2,7 +2,7 @@ from langchain.agents.middleware import AgentMiddleware
 from langchain.tools.tool_node import ToolCallRequest
 from langchain.messages import ToolMessage
 from langgraph.types import Command
-from typing import Callable
+from typing import Any, Callable
 from datetime import datetime, UTC
 import json
 from configs.config import get_work_dir

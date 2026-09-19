@@ -46,14 +46,19 @@ def build_agent(
     enable_hitl: bool | None = None,
     extra_guidance: str = "",
 ):
-    model, _provider = build_client_model()
+    model, provider = build_client_model()
     use_hitl = hitl_enabled() if enable_hitl is None else enable_hitl
-    return create_agent(
-        model=model,
-        tools=ALL_TOOLS,
-        system_prompt=build_system_prompt(extra_guidance=extra_guidance),
-        middleware=build_middleware(enable_hitl=use_hitl),
-        response_format=ProviderStrategy(TurnSummary),
-        checkpointer=checkpointer or make_checkpointer(),
-        name="Coding Agent",
-    )
+
+    agent_kwargs: dict = {
+        "model": model,
+        "tools": ALL_TOOLS,
+        "system_prompt": build_system_prompt(extra_guidance=extra_guidance),
+        "middleware": build_middleware(enable_hitl=use_hitl),
+        "checkpointer": checkpointer or make_checkpointer(),
+        "name": "Coding Agent",
+    }
+
+    if getattr(provider, "name", None) != "Groq":
+        agent_kwargs["response_format"] = ProviderStrategy(TurnSummary)
+
+    return create_agent(**agent_kwargs)

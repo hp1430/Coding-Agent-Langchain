@@ -1,11 +1,8 @@
 import os
 import re
-from shlex import shlex
 import subprocess
 import sys
 import time
-from tracemalloc import start
-from turtle import stamp
 
 from langchain.tools import tool
 
@@ -63,19 +60,28 @@ def deny_command(command: str) -> str | None:
 def looks_like_server(command: str) -> bool:
     return any(re.search(pattern, command, flags=re.IGNORECASE) for pattern in SERVER_PATTERNS)
 
+def _shell_command(command: str) -> list[str]:
+    if os.name == "nt":
+        return ["cmd", "/c", command]
+    return ["/bin/bash", "-lc", command]
+
+
 def rewrite_command(command: str) -> str:
-    exe = shlex.quote(sys.executable)
+    exe = subprocess.list2cmdline([sys.executable]) if os.name == "nt" else "'" + sys.executable.replace("'", "'\\''") + "'"
 
     stripped = command.strip()
 
+    def replace_with(prefix: re.Pattern[str], literal: str) -> str:
+        return prefix.sub(lambda _m: literal, stripped, count=1)
+
     if _PIP_PREFIX.match(stripped):
-        return _PIP_PREFIX.sub(f"{exe} -m pip", stripped, count=1)
+        return replace_with(_PIP_PREFIX, f"{exe} -m pip")
 
     if _PYTHON_PREFIX.match(stripped):
-        return _PYTHON_PREFIX.sub(exe, stripped, count=1)
+        return replace_with(_PYTHON_PREFIX, exe)
 
     if _FLASK_PREFIX.match(stripped):
-        return _FLASK_PREFIX.sub(f"{exe} -m flask", stripped, count=1)
+        return replace_with(_FLASK_PREFIX, f"{exe} -m flask")
 
     return command
 
@@ -93,7 +99,7 @@ def _run_foreground(command: str, timeout: int) -> str:
 
     try:
         completed = subprocess.run(
-            ["/bin/bash", "-lc", command],
+            _shell_command(command),
             cwd=cwd,
             env=env,
             capture_output=True,
@@ -132,7 +138,7 @@ def _run_background(command: str) -> str:
 
     try:
         proc = subprocess.Popen(
-            ["/bin/bash", "-lc", command],
+            _shell_command(command),
             cwd=cwd,
             env=env,
             stdout=log_file,
@@ -192,13 +198,13 @@ def stop_job(pid: int) -> str:
 @tool
 def run_command(command: str, background: bool = False, timeout_seconds: int = 0) -> str:
     """
-    Run a bash command in the working directory (host machine, not a sandbox).
+    Run a command in the working directory (host machine, not a sandbox).
 
     Foreground commands wait for completion. Set background=True for servers like (flask, uvicorn, npm start)
     so they keep running. Server-like commands are auto backgrounded even if you forget the flag.
 
     Args:
-        command: bash command to run, e.g. 'python app.py' or 'ls -la'.
+        command: Windows command to run, e.g. 'python app.py' or 'dir'.
         background: If true, start the process and return pid immediately.
         timeout_seconds: Maximum time to wait for the command to complete. This is for foreground timeout. 0 uses default (30s).
     """
